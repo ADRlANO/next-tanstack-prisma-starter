@@ -1,9 +1,11 @@
-import type { NextPage } from 'next'
 import Head from 'next/head'
 import { useState } from 'react'
-import { prisma } from '../server/db/client'
-import { type GetServerSideProps } from 'next'
 import { useRouter } from 'next/router'
+import type { NextPage } from 'next'
+import { type GetServerSideProps } from 'next'
+
+import { prisma } from '../../lib/prisma'
+import { useAddNote, useDeleteNote, useUpdateNote } from '../../service/mutations/hooks'
 
 interface FormData {
   title: string
@@ -11,7 +13,7 @@ interface FormData {
   id: string
 }
 
-// Array interface
+// Notes interface
 interface Notes {
   notes: {
     id: string
@@ -25,30 +27,23 @@ const Home: NextPage<Notes> = ({ notes }) => {
   const [form, setForm] = useState<FormData>({title: '', content: '', id: ''})
   const [newNote, setNewNote] = useState<boolean>(true)
   const router = useRouter()
+  const { mutateAsync: createNote } = useAddNote();
+  const { mutateAsync: updateNote } = useUpdateNote();
+  const { mutateAsync: deleteNote } = useDeleteNote();
 
   const refreshData = () => {
     router.replace(router.asPath)
   }
 
   async function handleSubmit(data: FormData) {
-    // console.log(data)
-    // console.log(newNote)
-
     try {
       if (newNote) {
         // Check input is not blank
         if (data.title) {
           // CREATE
-          fetch('api/create', {
-            body: JSON.stringify(data),
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            method: 'POST'
-          }).then(() => {
-            setForm({title: '', content: '', id: ''})
-            refreshData()
-          })
+          await createNote(data);
+          setForm({title: '', content: '', id: ''})
+          refreshData()
         }
         else {
           alert("Title can not be blank")
@@ -56,42 +51,28 @@ const Home: NextPage<Notes> = ({ notes }) => {
       }
       else {
         // UPDATE
-          fetch(`api/note/${data.id}`, {
-            body: JSON.stringify(data),
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            method: 'PUT'
-          }).then(() => {
-            setForm({title: '', content: '', id: ''})
-            setNewNote(true)
-            refreshData()
-          })
+        await updateNote(data)
+        setForm({ title: '', content: '', id: '' })
+        setNewNote(true)
+        refreshData()
       }
     } catch (error) {
       console.log(error)
     }
   }
 
-  async function updateNote(title: string, content: string, id: string) {
-    //console.log(title, content, id)
-    setForm({title, content, id})
+  async function handleUpdateNote(title: string, content: string, id: string) {
+    setForm({ title, content, id })
     setNewNote(false)
   }
 
-  async function deleteNote(id: string) {
+  async function handleDeleteNote(id: string) {
     try {
-      fetch(`api/note/${id}`, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        method: 'DELETE'
-      }).then(() => {
-        refreshData()
-      })
+      await deleteNote(id)
+      refreshData()
     } catch (error) {
       console.log(error)
-    }    
+    }
   }
 
   function handleCancel() {
@@ -144,8 +125,8 @@ const Home: NextPage<Notes> = ({ notes }) => {
                   <h3 className="font-bold">{note.title}</h3>
                   <p className="text-sm">{note.content}</p>
                 </div>
-                <button onClick={() => updateNote(note.title, note.content, note.id)} className="bg-blue-500 px-3 text-white rounded">Edit</button>
-                <button onClick={() => deleteNote(note.id)} className="bg-red-500 px-3 text-white rounded">X</button>
+                <button onClick={() => handleUpdateNote(note.title, note.content, note.id)} className="bg-blue-500 px-3 text-white rounded">Edit</button>
+                <button onClick={() => handleDeleteNote(note.id)} className="bg-red-500 px-3 text-white rounded">X</button>
               </div>
             </li>
           ))}
